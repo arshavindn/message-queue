@@ -1,5 +1,6 @@
 #include <stdio.h>
 #include <stdlib.h>
+#include <math.h>
 #include <string.h>
 #include <regex.h>
 #include <ctype.h>
@@ -33,10 +34,10 @@ void remove_spaces(char **str)
 }
 
 
-int calculate_expression(char* source)
+char** extract_expression(char* source)
 {
-    float x1, x2;
-    char *operator_type;
+    char** result = malloc(3*sizeof(char*));
+    char* operator_type;
     operator_type = (char*) malloc(sizeof(char));
     char* pattern = "(\\-?[0-9]+)([\\+-\\*/]{1})(\\-?[0-9]+)";
     size_t maxMatches = 1;
@@ -50,7 +51,7 @@ int calculate_expression(char* source)
     if (regcomp(&regexCompiled, pattern, REG_EXTENDED))
     {
         printf("Could not compile regular expression.\n");
-        return 1;
+        return NULL;
     };
 
     m = 0;
@@ -82,21 +83,31 @@ int calculate_expression(char* source)
             //              m, g, groupArray[g].rm_so, groupArray[g].rm_eo,
             //              cursorCopy + groupArray[g].rm_so);
             // printf("%s\n", cursorCopy + groupArray[g].rm_so);
-            if (g == 1) x1 = atof(cursorCopy + groupArray[g].rm_so);
-            else if (g == 2) strcpy(operator_type, cursorCopy + groupArray[g].rm_so);
-            else if (g == 3) x2 = atof(cursorCopy + groupArray[g].rm_so);
-            // printf("%f %s %f\n", x1, operator_type, x2);
+            if (g > 0) {
+                result[g-1] = malloc(sizeof(char)*strlen(cursorCopy + groupArray[g].rm_so));
+                strcpy(result[g-1], cursorCopy + groupArray[g].rm_so);
+            }
         }
         cursor += offset;
-        if (strcmp(operator_type, "+") == 0) printf("%f\n", x1+x2);
-        else if (strcmp(operator_type, "-") == 0) printf("%f\n", x1-x2);
-        else if (strcmp(operator_type, "*") == 0) printf("%f\n", x1*x2);
-        else if (strcmp(operator_type, "/") == 0) printf("%f\n", x1/x2);
     }
-
+    // for (int i = 0; i < 3; i++) puts(result[i]);
     regfree(&regexCompiled);
     free(operator_type);
-    return 0;
+    return result;
+}
+
+
+float calculate(char** array) {
+    if (array != NULL) {
+        float x1 = atof(*(array+0));
+        float x2 = atof(*(array+2));
+        if (strcmp(*(array+1), "+") == 0) return x1 + x2;
+        else if (strcmp(*(array+1), "-") == 0) return x1 - x2;
+        else if (strcmp(*(array+1), "*") == 0) return x1 * x2;
+        else if (strcmp(*(array+1), "/") == 0) return x1 / x2;
+        else return NAN;
+    }
+    else return NAN;
 }
 
 
@@ -187,7 +198,7 @@ int main() {
                         // printf("Child 2 rbuf %s, len = %lu\n", rbuf.mtext, strlen(rbuf.mtext));
                         remove_spaces(&source);
                         // printf("Child 2 source %s, len = %lu\n", source, strlen(source));
-                        calculate_expression(source);
+                        printf("%5.2f\n", calculate(extract_expression(source)));
                         free(source);
                     }
                 }
