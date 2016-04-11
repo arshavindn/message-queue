@@ -118,28 +118,27 @@ int main() {
      * "name" 1234, which was created by
      * the server.
      */
-    key_t KEY = 1234;
+    key_t KEY = 1234, KEY2 = 5678;
     char FINISHED_MESSAGE[17] = "Sending finished";
+    int MSGFLG = IPC_CREAT | 0666;
     pid_t child1_process = fork();
     if (child1_process >= 0) {
         // IN CHILD 1 PROCESS
         if (child1_process == 0) {
-            int msqid;
-            int msgflg = IPC_CREAT | 0666;
-            message_buf sbuf;
+            int msqid, msqid2;
+            message_buf send_buf, receive_result_buf;
+            // We'll send message type 1
+            send_buf.mtype = 1;
             size_t buf_length;
 
-            (void) fprintf(stderr, "msgget: Calling msgget(%d,%#o)\n", KEY, msgflg);
+            (void) fprintf(stderr, "msgget: Calling msgget(%d,%#o)\n", KEY, MSGFLG);
 
-            if ((msqid = msgget(KEY, msgflg)) < 0) {
+            if ((msqid = msgget(KEY, MSGFLG)) < 0) {
                 perror("msgget");
                 exit(1);
             }
             else
                 (void) fprintf(stderr,"msgget: msgget succeeded: msqid = %d\n", msqid);
-
-            // We'll send message type 1
-            sbuf.mtype = 1;
 
             FILE *fp;
             char buff[255], temp[255];
@@ -149,26 +148,54 @@ int main() {
                 fgets(buff, 255, (FILE*)fp);
                 if (strcmp(temp, buff) == 0) {
                     fclose(fp);
-                    (void) strcpy(sbuf.mtext, FINISHED_MESSAGE);
+                    (void) strcpy(send_buf.mtext, FINISHED_MESSAGE);
                 }
                 else {
                     (void) strcpy(temp, buff);
-                    (void) strcpy(sbuf.mtext, buff);
-                    if (sbuf.mtext[strlen(sbuf.mtext)-1] == '\n')
-                        sbuf.mtext[strlen(sbuf.mtext)-1] = '\0';  // Remove \n character
+                    (void) strcpy(send_buf.mtext, buff);
+                    if (send_buf.mtext[strlen(send_buf.mtext)-1] == '\n')
+                        send_buf.mtext[strlen(send_buf.mtext)-1] = '\0';  // Remove \n character
                 }
                 // Send a message.
-                buf_length = strlen(sbuf.mtext) + 1;
-                if (msgsnd(msqid, &sbuf, buf_length, IPC_NOWAIT) < 0) {
-                    printf ("%d, %ld, %s, %lu\n", msqid, sbuf.mtype, sbuf.mtext, buf_length);
+                buf_length = strlen(send_buf.mtext) + 1;
+                if (msgsnd(msqid, &send_buf, buf_length, IPC_NOWAIT) < 0) {
+                    printf ("%d, %ld, %s, %lu\n", msqid, send_buf.mtype, send_buf.mtext, buf_length);
                     perror("msgsnd");
                     exit(1);
                 }
                 else {
-                    printf("Child 1 Message: \"%s\" Sent\n", sbuf.mtext);
-                    if (strcmp(sbuf.mtext, FINISHED_MESSAGE) == 0) break;
+                    printf("Child 1 Message: \"%s\" Sent\n", send_buf.mtext);
+                    if (strcmp(send_buf.mtext, FINISHED_MESSAGE) == 0) break;
                 }
             }
+            /*
+             * RECEIVE RESULT FROM CHILD 2
+             */
+            if ((msqid2 = msgget(KEY2, 0666)) < 0) {
+                perror("msgget");
+                exit(1);
+            }
+            int i = 0;
+            fp = fopen("/tmp/test.txt", "w");
+            while (1 == 1) {
+                if (msgrcv(msqid2, &receive_result_buf, MSGSZ, 1, 0) < 0) {
+                    exit(1);
+                }
+                if (strcmp(receive_result_buf.mtext, FINISHED_MESSAGE) == 0) break;
+                printf("Result %d: %s\n", i, receive_result_buf.mtext);
+                if (i == 0) {
+                    fputs(receive_result_buf.mtext, fp);
+                    fputs("\n", fp);
+                    fclose(fp);
+                    fp = fopen("/tmp/test.txt", "a");
+                }
+                else {
+                    fputs(receive_result_buf.mtext, fp);
+                    fputs("\n", fp);
+                }
+                i++;
+            }
+            fclose(fp);
         }
         // IN MAIN PROCESS
         else {
@@ -176,34 +203,69 @@ int main() {
             if (child2_process >= 0) {
                 // IN CHILD 2 PROCESS
                 if (child2_process == 0) {
-                    int msqid;
-                    message_buf  rbuf;
+                    int msqid, msqid2;
+                    size_t buf_length;
+                    message_buf  receive_buf, send_back_buf;
+                    send_back_buf.mtype = 1;
                     char *source;
+                    char result[30];
 
                     printf("Child 2 pid = %d\n", getpid());
+
                     if ((msqid = msgget(KEY, 0666)) < 0) {
                         perror("msgget");
                         exit(1);
                     }
+                    // queue for send back the result
+                    (void) fprintf(stderr, "msgget: Calling msgget(%d,%#o)\n", KEY2, MSGFLG);
+
+                    if ((msqid2 = msgget(KEY2, MSGFLG)) < 0) {
+                        perror("msgget");
+                        exit(1);
+                    }
+                    else
+                        (void) fprintf(stderr,"msgget: msgget succeeded: msqid = %d\n", msqid2);
+
                     while (1 == 1) {
                         // Receive an answer of message type 1.
-                        if (msgrcv(msqid, &rbuf, MSGSZ, 1, 0) < 0) {
+                        if (msgrcv(msqid, &receive_buf, MSGSZ, 1, 0) < 0) {
+                            perror("msgrcv");
                             exit(1);
                         }
 
-                        //Print the answer.
-                        if (strcmp(rbuf.mtext, FINISHED_MESSAGE) == 0) break;
-                        source = (char*)malloc(strlen(rbuf.mtext)*sizeof(char));  // remember free source
-                        strcpy(source, rbuf.mtext);
-                        // printf("Child 2 rbuf %s, len = %lu\n", rbuf.mtext, strlen(rbuf.mtext));
-                        remove_spaces(&source);
-                        // printf("Child 2 source %s, len = %lu\n", source, strlen(source));
-                        printf("%5.2f\n", calculate(extract_expression(source)));
+                        if (strcmp(receive_buf.mtext, FINISHED_MESSAGE) == 0) strcpy(result, FINISHED_MESSAGE);
+                        else {
+                            source = (char*)malloc(strlen(receive_buf.mtext)*sizeof(char));  // remember free source
+                            strcpy(source, receive_buf.mtext);
+                            remove_spaces(&source);
+                            sprintf(result, "%-5.2f", calculate(extract_expression(source)));
+                            char temp[strlen(source)+strlen("=")+strlen(result)+1];
+                            strcpy(temp, source);
+                            strcat(temp, "=");
+                            strcat(temp, result);
+                            strcpy(result, temp);
+                        }
+                        /*
+                         * PREPAIRE QUEUE FOR SENDING BACK TO CHILD1
+                         */
+                        (void) strcpy(send_back_buf.mtext, result);
+                        buf_length = strlen(send_back_buf.mtext) + 1;
+                        if (msgsnd(msqid2, &send_back_buf, buf_length, IPC_NOWAIT) < 0) {
+                            printf ("%d, %ld, %s, %lu\n", msqid2, send_back_buf.mtype, send_back_buf.mtext, buf_length);
+                            perror("msgsnd");
+                            exit(1);
+                        }
+                        else {
+                            printf("Child 2 Result: \"%s\" Sent\n", send_back_buf.mtext);
+                            if (strcmp(send_back_buf.mtext, FINISHED_MESSAGE) == 0) break;
+                        }
+                        // free source
                         free(source);
                     }
                 }
                 else {
-                    sleep(3);
+                    // wait for all child finish
+                    sleep(1);
                 }
             }
             else {

@@ -1,7 +1,8 @@
 # depslib dependency file v1.0
-1460369720 source:/home/mozart/Documents/Study/shell/C/message_queue/main.c
+1460399892 source:/home/mozart/Documents/Study/shell/C/message_queue/main.c
 	<stdio.h>
 	<stdlib.h>
+	<math.h>
 	<string.h>
 	<regex.h>
 	<ctype.h>
