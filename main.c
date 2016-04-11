@@ -88,14 +88,13 @@ int calculate_expression(char* source)
             // printf("%f %s %f\n", x1, operator_type, x2);
         }
         cursor += offset;
+        if (strcmp(operator_type, "+") == 0) printf("%f\n", x1+x2);
+        else if (strcmp(operator_type, "-") == 0) printf("%f\n", x1-x2);
+        else if (strcmp(operator_type, "*") == 0) printf("%f\n", x1*x2);
+        else if (strcmp(operator_type, "/") == 0) printf("%f\n", x1/x2);
     }
 
     regfree(&regexCompiled);
-    // printf("Reach here?\n");
-    if (strcmp(operator_type, "+") == 0) printf("%f\n", x1+x2);
-    else if (strcmp(operator_type, "-") == 0) printf("%f\n", x1-x2);
-    else if (strcmp(operator_type, "*") == 0) printf("%f\n", x1*x2);
-    else if (strcmp(operator_type, "/") == 0) printf("%f\n", x1/x2);
     free(operator_type);
     return 0;
 }
@@ -195,6 +194,9 @@ int main() {
                 else {
                     sleep(3);
                 }
+            }
+            else {
+                puts("Error occured in forking.");
             }
         }
     }
