@@ -19,7 +19,7 @@ typedef struct msgbuf {
 void remove_spaces(char **str)
 {
     char *temp;
-    temp=*str;
+    temp = *str;
     char c[strlen(*str) + 1];
     int i = 0;
     for( ; *temp != '\0'; ++temp)
@@ -27,7 +27,7 @@ void remove_spaces(char **str)
             c[i] = *temp;
             i++;
         }
-    *str=NULL;
+    *str = NULL;
     *str = (char*)malloc(i++*sizeof(char));
     strncpy(*str, c, i*sizeof(char));
     // printf("rs %s\n", *str);
@@ -104,7 +104,9 @@ float calculate(char** array) {
         if (strcmp(*(array+1), "+") == 0) return x1 + x2;
         else if (strcmp(*(array+1), "-") == 0) return x1 - x2;
         else if (strcmp(*(array+1), "*") == 0) return x1 * x2;
-        else if (strcmp(*(array+1), "/") == 0) return x1 / x2;
+        else if (strcmp(*(array+1), "/") == 0)
+            if (x2 != 0) return x1 / x2;
+            else return NAN;
         else return NAN;
     }
     else return NAN;
@@ -238,7 +240,9 @@ int main() {
                             source = (char*)malloc(strlen(receive_buf.mtext)*sizeof(char));  // remember free source
                             strcpy(source, receive_buf.mtext);
                             remove_spaces(&source);
+                            // Copy result from calculate func to result variable with format.
                             sprintf(result, "%-5.2f", calculate(extract_expression(source)));
+                            // Join source string with result and assign to result variable.
                             char temp[strlen(source)+strlen("=")+strlen(result)+1];
                             strcpy(temp, source);
                             strcat(temp, "=");
